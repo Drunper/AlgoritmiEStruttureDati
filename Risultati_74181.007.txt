@@ -1,0 +1,12 @@
+Report esecuzione algoritmo base
+Versione: memorizzazione vettori rappresentativi + uso packbits
+Nome matrice: 74181.007
+Numero righe: 2
+Numero colonne: 65
+
+Esecuzione: completata
+Numero MHS trovati: 5
+Cardinalità minima MHS: 1
+Cardinalità massima MHS: 2
+
+Tempo di esecuzione algoritmo: 0.0
