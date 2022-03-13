@@ -1,4 +1,3 @@
 # AlgoritmiEStruttureDati
 
-Bozza di un possibile mhs.py, versione senza memorizzazione. Le informazioni relative all'esecuzione sono salvate su file, come i MHS calcolati (in forma di matrice)
-Possibilità di effettuare il tracking del consumo di memoria nel tempo e di plottare su grafico tale andamento.
+Bozza di un possibile mhs.py, versione dell'algoritmo da definire. L'applicazione esegue sia l'algoritmo senza pre-elaborazione, sia quello con pre-elaborazione, confronta i risultati e poi, per ogni matrice su cui è applicato l'algoritmo, salva i risultati in un file .csv.
