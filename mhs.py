@@ -202,7 +202,10 @@ def alg_con_pre(matrice, dominio):
 
 
 def max_min_mhs(lista_mhs):
-    return len(max(lista_mhs, key=len)), len(min(lista_mhs, key=len))
+    if lista_mhs:
+        return len(max(lista_mhs, key=len)), len(min(lista_mhs, key=len))
+    else:
+        return 0, 0
 
 
 def esegui_algoritmo_base(stato):
@@ -233,7 +236,7 @@ def prepara_risultati_csv(percorso_file):
     with percorso_file.open('w', encoding='UTF8', newline='') as file:
         writer = csv.writer(file)
         header = ['nome_matrice', 'righe', 'colonne', 'esecuzione_completata_1', 'n_iter_1', 'tempo_di_esecuzione_1',
-                  'massima_occupazione_memoria_1', 'numero_mhs_trovati', 'cardinalità_minima', 'cardinalità_massima',
+                  'massima_occupazione_memoria_1', 'numero_mhs_trovati', 'cardinalita_minima', 'cardinalita_massima',
                   'nuovo_numero_righe', 'nuovo_numero_colonne', 'esecuzione_completata_2', 'tempo_di_esecuzione_2',
                   'n_iter_2', 'massima_occupazione_memoria_2', 'risultati_uguali']
         writer.writerow(header)
@@ -291,17 +294,17 @@ def domanda_si_no(domanda):
 def main():
     parser = ArgumentParser(usage="mhs [opzioni] cartella", formatter_class=RawTextHelpFormatter)
     parser.add_argument("-o", "--output", dest="output",
-                        help="""Nome del file in cui verrà salvato il report riguardante l'esecuzione dell'algoritmo 
+                        help="""Nome del file in cui verra' salvato il report riguardante l'esecuzione dell'algoritmo 
                         sulle matrice di input""")
     parser.add_argument("-n", "--nomhs", dest="no_mhs", action="store_true",
-                        help="""""")
+                        help="""Opzione per disabilitare il salvataggio su file degli MHS generati""")
     parser.add_argument("cartella",
                         help="""Cartella che contiene le matrici su cui si vuole applicare l'algoritmo""")
     args = parser.parse_args()
 
     cartella = Path(args.cartella)
     if not cartella.is_dir():
-        print("Il percorso specificato non è una cartella")
+        print("Il percorso specificato non e' una cartella")
         sys.exit(1)
 
     cartella_risultati = Path(args.cartella, 'risultati')
@@ -312,7 +315,7 @@ def main():
             cartella_mhs = Path(args.cartella, 'risultati', 'mhs')
             cartella_mhs.mkdir(parents=True, exist_ok=False)
     except FileExistsError:
-        print("Cartella dei risultati già presente, alcuni file potrebbero essere sovrascritti")
+        print("Cartella dei risultati gia' presente, alcuni file potrebbero essere sovrascritti")
     else:
         print("Cartella dei risultati creata con successo")
 
@@ -342,17 +345,17 @@ def main():
                 print("Esecuzione dell'algoritmo base completata\n")
             tempo_di_esecuzione_1 = stato['tempo_esecuzione_1']
             massima_occupazione_memoria_1 = stato['massima_occupazione_memoria_1']
-            print(f"Il tempo richiesto dall'esecuzione base è stato di {tempo_di_esecuzione_1} s")
-            print(f"Il numero di iterazioni compiute è stato di {stato['n_iter_1']}")
-            print(f"La massima occupazione di memoria è stata di {massima_occupazione_memoria_1} MiB")
+            print(f"Il tempo richiesto dall'esecuzione base e' stato di {tempo_di_esecuzione_1} s")
+            print(f"Il numero di iterazioni compiute e' stato di {stato['n_iter_1']}")
+            print(f"La massima occupazione di memoria e' stata di {massima_occupazione_memoria_1} MiB")
             numero_mhs_trovati = len(stato['mhs_trovati'])
             if not args.no_mhs:
                 scrivi_mhs_su_file(stato['mhs_trovati'], nome_matrice,
                                    len(array_matrice[0]), linea_dominio, cartella_risultati)
             max_mhs, min_mhs = max_min_mhs(stato['mhs_trovati'])
             print(f"Sono stati trovati {numero_mhs_trovati} MHS")
-            print(f"La cardinalità minima dei MHS trovati è {min_mhs}")
-            print(f"La cardinalità massima dei MHS trovati è {max_mhs}\n")
+            print(f"La cardinalita' minima dei MHS trovati e' {min_mhs}")
+            print(f"La cardinalita' massima dei MHS trovati e' {max_mhs}\n")
 
             risposta = True
             if not stato['esecuzione_completata_1']:
@@ -382,15 +385,15 @@ def main():
                 colonne_rimosse = stato['colonne_rimosse']
                 nuovo_numero_righe = len(stato['matrice']) - len(righe_rimosse)
                 nuovo_numero_colonne = len(stato['matrice'][0]) - len(colonne_rimosse)
-                print(f"Dopo l'esecuzione della pre-elaborazione, il nuovo numero di righe è {nuovo_numero_righe}")
-                print(f"Dopo l'esecuzione della pre-elaborazione, il nuovo numero di colonne è {nuovo_numero_colonne}")
+                print(f"Dopo l'esecuzione della pre-elaborazione, il nuovo numero di righe e' {nuovo_numero_righe}")
+                print(f"Dopo l'esecuzione della pre-elaborazione, il nuovo numero di colonne e' {nuovo_numero_colonne}")
 
                 print(f"Gli indici di riga rimossi sono: {righe_rimosse}")
                 print(f"Gli indici di colonna rimossi sono: {colonne_rimosse}\n")
 
-                print(f"Il tempo richiesto dall'esecuzione con pre-elaborazione è stato di {tempo_di_esecuzione_2} s")
-                print(f"Il numero di iterazioni compiute è stato di {stato['n_iter_2']}")
-                print(f"La massima occupazione di memoria è stata di {massima_occupazione_memoria_2} MiB")
+                print(f"Il tempo richiesto dall'esecuzione con pre-elaborazione e' stato di {tempo_di_esecuzione_2} s")
+                print(f"Il numero di iterazioni compiute e' stato di {stato['n_iter_2']}")
+                print(f"La massima occupazione di memoria e' stata di {massima_occupazione_memoria_2} MiB")
                 if stato['risultati_uguali']:
                     print("I risultati ottenuti eseguendo la pre-elaborazione prima dell'applicazione dell'algoritmo "
                           "sono UGUALI a quelli ottenuti applicando l'algoritmo base\n")
