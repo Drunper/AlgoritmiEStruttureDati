@@ -237,7 +237,7 @@ def prepara_risultati_csv(percorso_file):
     percorso_file.touch()
     with percorso_file.open('w', encoding='UTF8', newline='') as file:
         writer = csv.writer(file)
-        header = ['nome_matrice', 'righe', 'colonne', 'esecuzione_completata_1', 'n_iter_1', 'tempo_di_esecuzione_1',
+        header = ['nome_matrice', 'righe', 'colonne', 'esecuzione_completata_1', 'tempo_di_esecuzione_1', 'n_iter_1',
                   'massima_occupazione_memoria_1', 'numero_mhs_trovati', 'cardinalita_minima', 'cardinalita_massima',
                   'nuovo_numero_righe', 'nuovo_numero_colonne', 'esecuzione_completata_2', 'tempo_di_esecuzione_2',
                   'n_iter_2', 'massima_occupazione_memoria_2', 'risultati_uguali']
