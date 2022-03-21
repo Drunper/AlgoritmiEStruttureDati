@@ -1,6 +1,0 @@
-nome_matrice,righe,colonne,esecuzione_completata_1,tempo_di_esecuzione_1,massima_occupazione_memoria_1,numero_mhs_trovati,cardinalità_minima,cardinalità_massima,nuovo_numero_righe,nuovo_numero_colonne,esecuzione_completata_2,tempo_di_esecuzione_2,massima_occupazione_memoria_2,risultati_uguali
-74181.007,2,65,1,0.015625,42.7421875,5,2,1,2,5,1,0.0,42.71875,1
-74181.026,5,65,1,0.03125,42.671875,38,4,3,4,23,1,0.015625,42.8359375,1
-74181.031,12,65,1,6.609375,47.51171875,8656,6,4,10,54,1,2.125,44.51171875,1
-74181.033,18,65,1,52.109375,63.109375,11124,8,4,16,49,1,6.515625,45.79296875,1
-74181.042,28,65,1,153.0625,78.828125,31544,11,5,26,53,1,90.609375,65.71875,1
