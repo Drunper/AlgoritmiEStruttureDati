@@ -93,7 +93,8 @@ def alg_base(matrice, dominio):
     with keyboard.Listener(on_press=on_press) as listener:
         while coda and not break_program:
             insieme = coda.popleft()
-            e = succ(max_insieme(insieme))
+            m = max_insieme(insieme)
+            e = succ(m)
 
             for elem in range(e, valore_max + 1):
                 n_iter += 1
@@ -104,8 +105,8 @@ def alg_base(matrice, dominio):
                 if result == "ok" and elem != valore_max:
                     coda.append(nuovo_insieme)
                 elif result == "mhs":
-                    output(nuovo_insieme, dominio)
                     lista_mhs.append(nuovo_insieme)
+    output(lista_mhs, dominio)
     return lista_mhs, process_time() - start_time, n_iter
 
 
@@ -134,9 +135,10 @@ def crea_vett_rapp(insieme, array_matrice):
     return vett_rapp
 
 
-def output(mhs, dominio):
-    for i in range(len(mhs)):
-        mhs[i] = dominio[mhs[i] - 1]
+def output(lista_mhs, dominio):
+    for mhs in lista_mhs:
+        for i in range(len(mhs)):
+            mhs[i] = dominio[mhs[i] - 1]
 
 
 def contiene(matrice, first, second):
@@ -146,17 +148,17 @@ def contiene(matrice, first, second):
     return True
 
 
-def costruisci_lista(matrice):
+def costruisci_array(matrice):
     lista = []
     for i in range(0, len(matrice)):
         lista.append((sum(matrice[i]), i))
     lista.sort(key=lambda x: x[0], reverse=True)
-    return list(list(zip(*lista))[1])
+    return arr.array('H', list(zip(*lista))[1])
 
 
 def togli_righe(matrice):
-    indici_rimossi = []
-    lista = costruisci_lista(matrice)
+    indici_rimossi = arr.array('H', [])
+    lista = costruisci_array(matrice)
     j = len(lista)
     for i in range(j):
         for k in range(i + 1, j):
@@ -164,7 +166,7 @@ def togli_righe(matrice):
                 indici_rimossi.append(lista[i])
                 break
 
-    indici_rimossi.sort(reverse=True)
+    indici_rimossi = arr.array('H', sorted(indici_rimossi, reverse=True))
     for i in indici_rimossi:
         del matrice[i]
     return indici_rimossi
@@ -178,7 +180,7 @@ def colonna_di_zeri(matrice, indice):
 
 
 def togli_colonne(matrice):
-    indici_rimossi = []
+    indici_rimossi = arr.array('H', [])
     for i in range(len(matrice[0])):
         if colonna_di_zeri(matrice, i):
             indici_rimossi.append(i)
@@ -248,25 +250,31 @@ def scrivi_risultati_csv(risultati, percorso_file):
         writer.writerow(risultati)
 
 
-def stringa_da_array(array):
+def stringa_da_array(array, a_capo=True):
     if array:
         separatore = " "
         stringa = separatore.join([str(elem) for elem in array])
-        return f'{stringa} -\n'
+        if a_capo:
+            return f'{stringa} -\n'
+        else:
+            return stringa
     else:
         return '\n'
 
 
-def scrivi_mhs_su_file(lista_mhs, nome_matrice, colonne, linea_dominio, cartella_risultati):
+def scrivi_mhs_su_file(lista_mhs, nome_matrice, colonne, linea_dominio, cartella_risultati, salva_matrice):
     percorso_file = Path(cartella_risultati, 'mhs', nome_matrice + '.txt')
     percorso_file.touch()
     with percorso_file.open('w') as file:
         file.write(linea_dominio)
         for mhs in lista_mhs:
-            mhs_array = arr.array('H', [0] * colonne)
-            for elem in mhs:
-                mhs_array[elem] = 1
-            file.write(stringa_da_array(mhs_array))
+            if salva_matrice:
+                mhs_array = arr.array('H', [0] * colonne)
+                for elem in mhs:
+                    mhs_array[elem] = 1
+                file.write(stringa_da_array(mhs_array))
+            else:
+                file.write(stringa_da_array(mhs))
 
 
 def controllo_risultati_mhs(lista_mhs_pre_elaborazione, lista_mhs_base):
@@ -298,6 +306,8 @@ def main():
                         sulle matrice di input""")
     parser.add_argument("-n", "--nomhs", dest="no_mhs", action="store_true",
                         help="""Opzione per disabilitare il salvataggio su file degli MHS generati""")
+    parser.add_argument("-m", "--matrice", dest="salva_matrice", action="store_true",
+                        help="""Opzione per abilitare il salvataggio degli MHS calcolati come matrice""")
     parser.add_argument("cartella",
                         help="""Cartella che contiene le matrici su cui si vuole applicare l'algoritmo""")
     args = parser.parse_args()
@@ -351,7 +361,7 @@ def main():
             numero_mhs_trovati = len(stato['mhs_trovati'])
             if not args.no_mhs:
                 scrivi_mhs_su_file(stato['mhs_trovati'], nome_matrice,
-                                   len(array_matrice[0]), linea_dominio, cartella_risultati)
+                                   len(array_matrice[0]), linea_dominio, cartella_risultati, args.salva_matrice)
             max_mhs, min_mhs = max_min_mhs(stato['mhs_trovati'])
             print(f"Sono stati trovati {numero_mhs_trovati} MHS")
             print(f"La cardinalita' minima dei MHS trovati e' {min_mhs}")
@@ -388,8 +398,8 @@ def main():
                 print(f"Dopo l'esecuzione della pre-elaborazione, il nuovo numero di righe e' {nuovo_numero_righe}")
                 print(f"Dopo l'esecuzione della pre-elaborazione, il nuovo numero di colonne e' {nuovo_numero_colonne}")
 
-                print(f"Gli indici di riga rimossi sono: {righe_rimosse}")
-                print(f"Gli indici di colonna rimossi sono: {colonne_rimosse}\n")
+                print(f"Gli indici di riga rimossi sono: {stringa_da_array(righe_rimosse, a_capo=False)}")
+                print(f"Gli indici di colonna rimossi sono: {stringa_da_array(colonne_rimosse, a_capo=False)}\n")
 
                 print(f"Il tempo richiesto dall'esecuzione con pre-elaborazione e' stato di {tempo_di_esecuzione_2} s")
                 print(f"Il numero di iterazioni compiute e' stato di {stato['n_iter_2']}")
