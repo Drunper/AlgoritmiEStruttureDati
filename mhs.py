@@ -61,7 +61,7 @@ def carica_matrice(percorso_file):
         print(f'Matrice: {nome_matrice}')
         print(f'Numero righe: {righe}')
         print(f'Numero colonne: {colonne}')
-        dominio_base = list(range(0, len(array[0])))
+        dominio_base = arr.array('H', list(range(0, len(array[0]))))
         return nome_matrice, array, dominio_base, linea_dominio, True
     else:
         print('Errore sulle dimensioni del file')
