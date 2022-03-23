@@ -157,7 +157,7 @@ def costruisci_array(matrice):
 
 
 def togli_righe(matrice):
-    indici_rimossi = arr.array('H', [])
+    indici_rimossi = []
     lista = costruisci_array(matrice)
     j = len(lista)
     for i in range(j):
@@ -166,10 +166,10 @@ def togli_righe(matrice):
                 indici_rimossi.append(lista[i])
                 break
 
-    indici_rimossi = arr.array('H', sorted(indici_rimossi, reverse=True))
+    indici_rimossi.sort(reverse=True)
     for i in indici_rimossi:
         del matrice[i]
-    return indici_rimossi
+    return arr.array('H', indici_rimossi)
 
 
 def colonna_di_zeri(matrice, indice):
@@ -180,18 +180,18 @@ def colonna_di_zeri(matrice, indice):
 
 
 def togli_colonne(matrice):
-    indici_rimossi = arr.array('H', [])
-    for i in range(len(matrice[0])):
+    indici_rimossi = []
+    for i in range(len(matrice[0]) - 1, -1, -1):
         if colonna_di_zeri(matrice, i):
             indici_rimossi.append(i)
-    for i in reversed(indici_rimossi):
+    for i in indici_rimossi:
         deque(map(lambda x: x.pop(i), matrice), maxlen=0)
-    return indici_rimossi
+    return arr.array('H', indici_rimossi)
 
 
 def pre_elaborazione_dominio(dominio, indici_da_rimuovere):
     if indici_da_rimuovere:
-        for i in reversed(indici_da_rimuovere):
+        for i in indici_da_rimuovere:
             del dominio[i]
 
 
@@ -216,7 +216,16 @@ def esegui_algoritmo_base(stato):
     stato['massima_occupazione_memoria_1'] = max_usage
     stato['esecuzione_completata_1'] = not break_program
     stato['tempo_esecuzione_1'] = ret[1]
-    stato['mhs_trovati'] = ret[0]
+    if len(ret[0]) > 2_000_000:  # Se ci sono troppi MHS inserirli nel dizionario porta ad un MemoryError
+        stato['mhs_disponibili'] = False
+    else:
+        stato['mhs_trovati'] = ret[0]
+        stato['mhs_disponibili'] = True
+    if not stato['no_mhs']:
+        scrivi_mhs_su_file(ret[0], stato['nome_matrice'], stato['colonne'], stato['linea_dominio'],
+                           stato['cartella_risultati'], stato['salva_matrice'])
+    stato['numero_mhs'] = len(ret[0])
+    stato['max_mhs'], stato['min_mhs'] = max_min_mhs(ret[0])
     stato['n_iter_1'] = ret[2]
 
 
@@ -230,7 +239,10 @@ def esegui_algoritmo_con_pre(stato):
     stato['righe_rimosse'] = ret[3]
     stato['colonne_rimosse'] = ret[4]
     print("Controllo risultati esecuzione con pre-elaborazione in corso")
-    stato['risultati_uguali'] = controllo_risultati_mhs(ret[0], stato['mhs_trovati'])
+    if stato['mhs_disponibili']:
+        stato['risultati_uguali'] = controllo_risultati_mhs(ret[0], stato['mhs_trovati'])
+    else:
+        stato['risultati_uguali'] = '?'
 
 
 def prepara_risultati_csv(percorso_file):
@@ -346,7 +358,10 @@ def main():
 
         if controllo:
             print(f"Inizio esecuzione algoritmo base sulla matrice {nome_matrice}, premi SPAZIO per terminarla")
-            stato = manager.dict(matrice=array_matrice, dominio=dominio)
+            stato = manager.dict(matrice=array_matrice, dominio=dominio, no_mhs=args.no_mhs, nome_matrice=nome_matrice,
+                                 colonne=len(array_matrice[0]), linea_dominio=linea_dominio,
+                                 cartella_risultati=cartella_risultati,
+                                 salva_matrice=args.salva_matrice)
             p = multiprocessing.Process(target=esegui_algoritmo_base, args=(stato,))
             p.start()
             p.join()
@@ -358,14 +373,9 @@ def main():
             print(f"Il tempo richiesto dall'esecuzione base e' stato di {tempo_di_esecuzione_1} s")
             print(f"Il numero di iterazioni compiute e' stato di {stato['n_iter_1']}")
             print(f"La massima occupazione di memoria e' stata di {massima_occupazione_memoria_1} MiB")
-            numero_mhs_trovati = len(stato['mhs_trovati'])
-            if not args.no_mhs:
-                scrivi_mhs_su_file(stato['mhs_trovati'], nome_matrice,
-                                   len(array_matrice[0]), linea_dominio, cartella_risultati, args.salva_matrice)
-            max_mhs, min_mhs = max_min_mhs(stato['mhs_trovati'])
-            print(f"Sono stati trovati {numero_mhs_trovati} MHS")
-            print(f"La cardinalita' minima dei MHS trovati e' {min_mhs}")
-            print(f"La cardinalita' massima dei MHS trovati e' {max_mhs}\n")
+            print(f"Sono stati trovati {stato['numero_mhs']} MHS")
+            print(f"La cardinalita' minima dei MHS trovati e' {stato['min_mhs']}")
+            print(f"La cardinalita' massima dei MHS trovati e' {stato['max_mhs']}\n")
 
             risposta = True
             if not stato['esecuzione_completata_1']:
@@ -374,7 +384,7 @@ def main():
                 if not risposta:
                     risultati = [nome_matrice, len(stato['matrice']), len(stato['matrice'][0]),
                                  int(stato['esecuzione_completata_1']), tempo_di_esecuzione_1, stato['n_iter_1'],
-                                 massima_occupazione_memoria_1, numero_mhs_trovati, min_mhs, max_mhs,
+                                 massima_occupazione_memoria_1, stato['numero_mhs'], stato['min_mhs'], stato['max_mhs'],
                                  '?', '?', '?', '?', '?',
                                  '?', '?']
                     scrivi_risultati_csv(risultati, output_file_risultati)
@@ -399,25 +409,28 @@ def main():
                 print(f"Dopo l'esecuzione della pre-elaborazione, il nuovo numero di colonne e' {nuovo_numero_colonne}")
 
                 print(f"Gli indici di riga rimossi sono: {stringa_da_array(righe_rimosse, a_capo=False)}")
-                print(f"Gli indici di colonna rimossi sono: {stringa_da_array(colonne_rimosse, a_capo=False)}\n")
+                print(f"Gli indici di colonna rimossi sono: {stringa_da_array(sorted(colonne_rimosse), a_capo=False)}\n")
 
                 print(f"Il tempo richiesto dall'esecuzione con pre-elaborazione e' stato di {tempo_di_esecuzione_2} s")
                 print(f"Il numero di iterazioni compiute e' stato di {stato['n_iter_2']}")
                 print(f"La massima occupazione di memoria e' stata di {massima_occupazione_memoria_2} MiB")
-                if stato['risultati_uguali']:
+                if stato['risultati_uguali'] == '?':
+                    print("Il numero di mhs trovati era troppo grande per poter effettuare il controllo di correttezza")
+                elif stato['risultati_uguali']:
                     print("I risultati ottenuti eseguendo la pre-elaborazione prima dell'applicazione dell'algoritmo "
                           "sono UGUALI a quelli ottenuti applicando l'algoritmo base\n")
                 else:
                     print("ERRORE: I risultati ottenuti eseguendo la pre-elaborazione prima dell'applicazione "
                           "dell'algoritmo sono DIVERSI da quelli ottenuti applicando l'algoritmo base\n")
 
+                risultati_uguali = '?' if stato['risultati_uguali'] == '?' else int(stato['risultati_uguali'])
                 risultati = [nome_matrice, len(stato['matrice']), len(stato['matrice'][0]),
                              int(stato['esecuzione_completata_1']),
                              tempo_di_esecuzione_1, stato['n_iter_1'],
-                             massima_occupazione_memoria_1, numero_mhs_trovati, min_mhs, max_mhs,
+                             massima_occupazione_memoria_1, stato['numero_mhs'], stato['min_mhs'], stato['max_mhs'],
                              nuovo_numero_righe, nuovo_numero_colonne, int(stato['esecuzione_completata_2']),
                              tempo_di_esecuzione_2, stato['n_iter_2'],
-                             massima_occupazione_memoria_2, int(stato['risultati_uguali'])]
+                             massima_occupazione_memoria_2, risultati_uguali]
                 scrivi_risultati_csv(risultati, output_file_risultati)
 
             if not risposta or not stato['esecuzione_completata_2']:
