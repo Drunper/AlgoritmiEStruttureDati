@@ -141,16 +141,16 @@ def output(lista_mhs, dominio):
             mhs[i] = dominio[mhs[i] - 1]
 
 
-def contiene(matrice, first, second):
-    for k in range(0, len(matrice[0])):
-        if (not matrice[first][k]) and matrice[second][k]:
+def contiene(matrice, i, j):
+    for k in range(len(matrice[0])):
+        if (not matrice[i][k]) and matrice[j][k]:
             return False
     return True
 
 
 def costruisci_array(matrice):
     lista = []
-    for i in range(0, len(matrice)):
+    for i in range(len(matrice)):  # Numero di righe
         lista.append((sum(matrice[i]), i))
     lista.sort(key=lambda x: x[0], reverse=True)
     return arr.array('H', list(zip(*lista))[1])
@@ -158,23 +158,24 @@ def costruisci_array(matrice):
 
 def togli_righe(matrice):
     indici_rimossi = []
-    lista = costruisci_array(matrice)
-    j = len(lista)
+    array = costruisci_array(matrice)
+    j = len(array)
     for i in range(j):
         for k in range(i + 1, j):
-            if contiene(matrice, lista[i], lista[k]):
-                indici_rimossi.append(lista[i])
+            if contiene(matrice, array[i], array[k]):
+                indici_rimossi.append(array[i])
                 break
 
     indici_rimossi.sort(reverse=True)
     for i in indici_rimossi:
         del matrice[i]
-    return arr.array('H', indici_rimossi)
+    indici_rimossi = arr.array('H', indici_rimossi)
+    return indici_rimossi, len(indici_rimossi)
 
 
-def colonna_di_zeri(matrice, indice):
+def colonna_di_zero(matrice, i):
     for j in range(len(matrice)):
-        if matrice[j][indice]:
+        if matrice[j][i]:
             return False
     return True
 
@@ -182,11 +183,12 @@ def colonna_di_zeri(matrice, indice):
 def togli_colonne(matrice):
     indici_rimossi = []
     for i in range(len(matrice[0]) - 1, -1, -1):
-        if colonna_di_zeri(matrice, i):
+        if colonna_di_zero(matrice, i):
             indici_rimossi.append(i)
     for i in indici_rimossi:
         deque(map(lambda x: x.pop(i), matrice), maxlen=0)
-    return arr.array('H', indici_rimossi)
+    indici_rimossi = arr.array('H', indici_rimossi)
+    return indici_rimossi, len(indici_rimossi)
 
 
 def pre_elaborazione_dominio(dominio, indici_da_rimuovere):
@@ -196,11 +198,13 @@ def pre_elaborazione_dominio(dominio, indici_da_rimuovere):
 
 
 def alg_con_pre(matrice, dominio):
-    righe_rimosse = togli_righe(matrice)
-    colonne_rimosse = togli_colonne(matrice)
+    righe_rimosse, numero_righe_rimosse = togli_righe(matrice)
+    colonne_rimosse, numero_colonne_rimosse = togli_colonne(matrice)
     pre_elaborazione_dominio(dominio, colonne_rimosse)
     lista_mhs, tempo_di_esecuzione, n_iter = alg_base(matrice, dominio)
-    return lista_mhs, tempo_di_esecuzione, n_iter, righe_rimosse, colonne_rimosse
+    return \
+        lista_mhs, tempo_di_esecuzione, n_iter, righe_rimosse, \
+        numero_righe_rimosse, colonne_rimosse, numero_colonne_rimosse
 
 
 def max_min_mhs(lista_mhs):
@@ -237,7 +241,10 @@ def esegui_algoritmo_con_pre(stato):
     stato['tempo_esecuzione_2'] = ret[1]
     stato['n_iter_2'] = ret[2]
     stato['righe_rimosse'] = ret[3]
-    stato['colonne_rimosse'] = ret[4]
+    stato['num_righe_rimosse'] = ret[4]
+    stato['colonne_rimosse'] = ret[5]
+    stato['num_colonne_rimosse'] = ret[6]
+    stato['numero_mhs_2'] = len(ret[0])
     print("Controllo risultati esecuzione con pre-elaborazione in corso")
     if stato['mhs_disponibili']:
         stato['risultati_uguali'] = controllo_risultati_mhs(ret[0], stato['mhs_trovati'])
@@ -403,27 +410,35 @@ def main():
                 massima_occupazione_memoria_2 = stato['massima_occupazione_memoria_2']
                 righe_rimosse = stato['righe_rimosse']
                 colonne_rimosse = stato['colonne_rimosse']
-                nuovo_numero_righe = len(stato['matrice']) - len(righe_rimosse)
-                nuovo_numero_colonne = len(stato['matrice'][0]) - len(colonne_rimosse)
+                nuovo_numero_righe = len(stato['matrice']) - stato['num_righe_rimosse']
+                nuovo_numero_colonne = len(stato['matrice'][0]) - stato['num_colonne_rimosse']
                 print(f"Dopo l'esecuzione della pre-elaborazione, il nuovo numero di righe e' {nuovo_numero_righe}")
                 print(f"Dopo l'esecuzione della pre-elaborazione, il nuovo numero di colonne e' {nuovo_numero_colonne}")
 
                 print(f"Gli indici di riga rimossi sono: {stringa_da_array(righe_rimosse, a_capo=False)}")
-                print(f"Gli indici di colonna rimossi sono: {stringa_da_array(sorted(colonne_rimosse), a_capo=False)}\n")
+                print(
+                    f"Gli indici di colonna rimossi sono: {stringa_da_array(sorted(colonne_rimosse), a_capo=False)}\n")
 
                 print(f"Il tempo richiesto dall'esecuzione con pre-elaborazione e' stato di {tempo_di_esecuzione_2} s")
                 print(f"Il numero di iterazioni compiute e' stato di {stato['n_iter_2']}")
                 print(f"La massima occupazione di memoria e' stata di {massima_occupazione_memoria_2} MiB")
-                if stato['risultati_uguali'] == '?':
+                print(f"Sono stati trovati {stato['numero_mhs_2']} MHS")
+                risultati_uguali = stato['risultati_uguali']
+                if risultati_uguali == '?':
                     print("Il numero di mhs trovati era troppo grande per poter effettuare il controllo di correttezza")
-                elif stato['risultati_uguali']:
+                elif risultati_uguali:
+                    risultati_uguali = int(risultati_uguali)
                     print("I risultati ottenuti eseguendo la pre-elaborazione prima dell'applicazione dell'algoritmo "
                           "sono UGUALI a quelli ottenuti applicando l'algoritmo base\n")
-                else:
+                elif stato['esecuzione_completata_1'] and stato['esecuzione_completata_2']:
+                    risultati_uguali = int(risultati_uguali)
                     print("ERRORE: I risultati ottenuti eseguendo la pre-elaborazione prima dell'applicazione "
                           "dell'algoritmo sono DIVERSI da quelli ottenuti applicando l'algoritmo base\n")
+                else:
+                    print("L'esecuzione dell'algoritmo è stata terminata dall'utente, il controllo dei risultati non "
+                          "è valido\n")
+                    risultati_uguali = '?'
 
-                risultati_uguali = '?' if stato['risultati_uguali'] == '?' else int(stato['risultati_uguali'])
                 risultati = [nome_matrice, len(stato['matrice']), len(stato['matrice'][0]),
                              int(stato['esecuzione_completata_1']),
                              tempo_di_esecuzione_1, stato['n_iter_1'],
