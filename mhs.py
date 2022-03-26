@@ -7,6 +7,7 @@ Created on Tue Mar  8 16:40:01 2022
 
 import array as arr
 import csv
+import filecmp
 import linecache
 import multiprocessing
 import re
@@ -220,14 +221,8 @@ def esegui_algoritmo_base(stato):
     stato['massima_occupazione_memoria_1'] = max_usage
     stato['esecuzione_completata_1'] = not break_program
     stato['tempo_esecuzione_1'] = ret[1]
-    if len(ret[0]) > 2_000_000:  # Se ci sono troppi MHS inserirli nel dizionario porta ad un MemoryError
-        stato['mhs_disponibili'] = False
-    else:
-        stato['mhs_trovati'] = ret[0]
-        stato['mhs_disponibili'] = True
-    if not stato['no_mhs']:
-        scrivi_mhs_su_file(ret[0], stato['nome_matrice'], stato['colonne'], stato['linea_dominio'],
-                           stato['cartella_risultati'], stato['salva_matrice'])
+    scrivi_mhs_su_file(ret[0], stato['nome_matrice'], stato['colonne'], stato['linea_dominio'],
+                       stato['cartella_risultati'], stato['salva_matrice'])
     stato['numero_mhs'] = len(ret[0])
     stato['max_mhs'], stato['min_mhs'] = max_min_mhs(ret[0])
     stato['n_iter_1'] = ret[2]
@@ -245,11 +240,8 @@ def esegui_algoritmo_con_pre(stato):
     stato['colonne_rimosse'] = ret[5]
     stato['num_colonne_rimosse'] = ret[6]
     stato['numero_mhs_2'] = len(ret[0])
-    print("Controllo risultati esecuzione con pre-elaborazione in corso")
-    if stato['mhs_disponibili']:
-        stato['risultati_uguali'] = controllo_risultati_mhs(ret[0], stato['mhs_trovati'])
-    else:
-        stato['risultati_uguali'] = '?'
+    scrivi_mhs_su_file(ret[0], stato['nome_matrice'], stato['colonne'], stato['linea_dominio'],
+                       stato['cartella_risultati'], stato['salva_matrice'], pre_elab=True)
 
 
 def prepara_risultati_csv(percorso_file):
@@ -281,8 +273,11 @@ def stringa_da_array(array, a_capo=True):
         return '\n'
 
 
-def scrivi_mhs_su_file(lista_mhs, nome_matrice, colonne, linea_dominio, cartella_risultati, salva_matrice):
-    percorso_file = Path(cartella_risultati, 'mhs', nome_matrice + '.txt')
+def scrivi_mhs_su_file(lista_mhs, nome_matrice, colonne, linea_dominio, cartella_risultati, salva_matrice, pre_elab=False):
+    if pre_elab:
+        percorso_file = Path(cartella_risultati, 'mhs', 'pre_elab', nome_matrice + '.txt')
+    else:
+        percorso_file = Path(cartella_risultati, 'mhs', 'base', nome_matrice + '.txt')
     percorso_file.touch()
     with percorso_file.open('w') as file:
         file.write(linea_dominio)
@@ -294,16 +289,6 @@ def scrivi_mhs_su_file(lista_mhs, nome_matrice, colonne, linea_dominio, cartella
                 file.write(stringa_da_array(mhs_array))
             else:
                 file.write(stringa_da_array(mhs))
-
-
-def controllo_risultati_mhs(lista_mhs_pre_elaborazione, lista_mhs_base):
-    if len(lista_mhs_pre_elaborazione) != len(lista_mhs_base):
-        return False
-    else:
-        for mhs_pre, mhs_base in zip(lista_mhs_pre_elaborazione, lista_mhs_base):
-            if mhs_pre != mhs_base:
-                return False
-        return True
 
 
 def domanda_si_no(domanda):
@@ -323,8 +308,6 @@ def main():
     parser.add_argument("-o", "--output", dest="output",
                         help="""Nome del file in cui verra' salvato il report riguardante l'esecuzione dell'algoritmo 
                         sulle matrice di input""")
-    parser.add_argument("-n", "--nomhs", dest="no_mhs", action="store_true",
-                        help="""Opzione per disabilitare il salvataggio su file degli MHS generati""")
     parser.add_argument("-m", "--matrice", dest="salva_matrice", action="store_true",
                         help="""Opzione per abilitare il salvataggio degli MHS calcolati come matrice""")
     parser.add_argument("cartella",
@@ -338,11 +321,10 @@ def main():
 
     cartella_risultati = Path(args.cartella, 'risultati')
     try:
-        if args.no_mhs:
-            cartella_risultati.mkdir(parents=True, exist_ok=False)
-        else:
-            cartella_mhs = Path(args.cartella, 'risultati', 'mhs')
-            cartella_mhs.mkdir(parents=True, exist_ok=False)
+        cartella_mhs = Path(args.cartella, 'risultati', 'mhs', 'pre_elab')
+        cartella_mhs.mkdir(parents=True, exist_ok=False)
+        cartella_mhs = Path(args.cartella, 'risultati', 'mhs', 'base')
+        cartella_mhs.mkdir(parents=True, exist_ok=False)
     except FileExistsError:
         print("Cartella dei risultati gia' presente, alcuni file potrebbero essere sovrascritti")
     else:
@@ -365,7 +347,7 @@ def main():
 
         if controllo:
             print(f"Inizio esecuzione algoritmo base sulla matrice {nome_matrice}, premi SPAZIO per terminarla")
-            stato = manager.dict(matrice=array_matrice, dominio=dominio, no_mhs=args.no_mhs, nome_matrice=nome_matrice,
+            stato = manager.dict(matrice=array_matrice, dominio=dominio, nome_matrice=nome_matrice,
                                  colonne=len(array_matrice[0]), linea_dominio=linea_dominio,
                                  cartella_risultati=cartella_risultati,
                                  salva_matrice=args.salva_matrice)
@@ -423,21 +405,24 @@ def main():
                 print(f"Il numero di iterazioni compiute e' stato di {stato['n_iter_2']}")
                 print(f"La massima occupazione di memoria e' stata di {massima_occupazione_memoria_2} MiB")
                 print(f"Sono stati trovati {stato['numero_mhs_2']} MHS")
-                risultati_uguali = stato['risultati_uguali']
-                if risultati_uguali == '?':
-                    print("Il numero di mhs trovati era troppo grande per poter effettuare il controllo di correttezza")
-                elif risultati_uguali:
+
+                if stato['esecuzione_completata_1'] and stato['esecuzione_completata_2']:
+                    print("Controllo risultati esecuzione con pre-elaborazione in corso")
+                    mhs_pre_elab = Path(cartella_risultati, 'mhs', 'pre_elab', nome_matrice + '.txt')
+                    mhs_base = Path(cartella_risultati, 'mhs', 'base', nome_matrice + '.txt')
+                    risultati_uguali = filecmp.cmp(mhs_base, mhs_pre_elab, shallow=False)
+                    if risultati_uguali:
+                        print(
+                            "I risultati ottenuti eseguendo la pre-elaborazione prima dell'applicazione dell'algoritmo "
+                            "sono UGUALI a quelli ottenuti applicando l'algoritmo base\n")
+                    else:
+                        print("ERRORE: I risultati ottenuti eseguendo la pre-elaborazione prima dell'applicazione "
+                              "dell'algoritmo sono DIVERSI da quelli ottenuti applicando l'algoritmo base\n")
                     risultati_uguali = int(risultati_uguali)
-                    print("I risultati ottenuti eseguendo la pre-elaborazione prima dell'applicazione dell'algoritmo "
-                          "sono UGUALI a quelli ottenuti applicando l'algoritmo base\n")
-                elif stato['esecuzione_completata_1'] and stato['esecuzione_completata_2']:
-                    risultati_uguali = int(risultati_uguali)
-                    print("ERRORE: I risultati ottenuti eseguendo la pre-elaborazione prima dell'applicazione "
-                          "dell'algoritmo sono DIVERSI da quelli ottenuti applicando l'algoritmo base\n")
                 else:
-                    print("L'esecuzione dell'algoritmo è stata terminata dall'utente, il controllo dei risultati non "
-                          "è valido\n")
                     risultati_uguali = '?'
+                    print("Una delle  due esecuzioni dell'algoritmo è stata terminata dall'utente, il controllo dei "
+                          "risultati non è valido\n")
 
                 risultati = [nome_matrice, len(stato['matrice']), len(stato['matrice'][0]),
                              int(stato['esecuzione_completata_1']),
