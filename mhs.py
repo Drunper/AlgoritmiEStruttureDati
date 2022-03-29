@@ -17,6 +17,10 @@ from collections import deque
 from pathlib import Path
 from time import process_time
 
+try:
+    import matplotlib.pyplot as plt
+except ImportError:
+    plt = None
 from memory_profiler import memory_usage
 from pynput import keyboard
 
@@ -46,8 +50,7 @@ def leggi_matrice(path):
 def leggi_dominio(nome_file):
     line = linecache.getline(nome_file, 5)
     dom = re.findall('\(([^)]+)', line)
-    array = list(dom)
-    return array, line
+    return dom, line
 
 
 def carica_matrice(percorso_file):
@@ -216,22 +219,26 @@ def max_min_mhs(lista_mhs):
 
 
 def esegui_algoritmo_base(stato):
-    max_usage, ret = memory_usage((alg_base, (stato['matrice'], stato['dominio']),), max_usage=True, retval=True,
+    mem_usata, ret = memory_usage((alg_base, (stato['matrice'], stato['dominio']),), timestamps=True, retval=True,
                                   max_iterations=1)
-    stato['massima_occupazione_memoria_1'] = max_usage
+    mem, _ = map(list, zip(*mem_usata))
+    stato['massima_occupazione_memoria_1'] = max(mem)
     stato['esecuzione_completata_1'] = not break_program
     stato['tempo_esecuzione_1'] = ret[1]
     scrivi_mhs_su_file(ret[0], stato['nome_matrice'], stato['colonne'], stato['linea_dominio'],
                        stato['cartella_risultati'], stato['salva_matrice'])
     stato['numero_mhs'] = len(ret[0])
-    stato['max_mhs'], stato['min_mhs'] = max_min_mhs(ret[0])
+    stato['max_mhs_1'], stato['min_mhs_1'] = max_min_mhs(ret[0])
     stato['n_iter_1'] = ret[2]
+    if stato['plot']:
+        plot_memoria(mem_usata, stato['cartella_risultati'], stato['nome_matrice'])
 
 
 def esegui_algoritmo_con_pre(stato):
-    max_usage, ret = memory_usage((alg_con_pre, (stato['matrice'], stato['dominio']),), max_usage=True, retval=True,
+    mem_usata, ret = memory_usage((alg_con_pre, (stato['matrice'], stato['dominio']),), timestamps=True, retval=True,
                                   max_iterations=1)
-    stato['massima_occupazione_memoria_2'] = max_usage
+    mem, _ = map(list, zip(*mem_usata))
+    stato['massima_occupazione_memoria_2'] = max(mem)
     stato['esecuzione_completata_2'] = not break_program
     stato['tempo_esecuzione_2'] = ret[1]
     stato['n_iter_2'] = ret[2]
@@ -240,8 +247,11 @@ def esegui_algoritmo_con_pre(stato):
     stato['colonne_rimosse'] = ret[5]
     stato['num_colonne_rimosse'] = ret[6]
     stato['numero_mhs_2'] = len(ret[0])
+    stato['max_mhs_2'], stato['min_mhs_2'] = max_min_mhs(ret[0])
     scrivi_mhs_su_file(ret[0], stato['nome_matrice'], stato['colonne'], stato['linea_dominio'],
                        stato['cartella_risultati'], stato['salva_matrice'], pre_elab=True)
+    if stato['plot']:
+        plot_memoria(mem_usata, stato['cartella_risultati'], stato['nome_matrice'], pre_elab=True)
 
 
 def prepara_risultati_csv(percorso_file):
@@ -251,7 +261,8 @@ def prepara_risultati_csv(percorso_file):
         header = ['nome_matrice', 'righe', 'colonne', 'esecuzione_completata_1', 'tempo_di_esecuzione_1', 'n_iter_1',
                   'massima_occupazione_memoria_1', 'numero_mhs_trovati', 'cardinalita_minima', 'cardinalita_massima',
                   'nuovo_numero_righe', 'nuovo_numero_colonne', 'esecuzione_completata_2', 'tempo_di_esecuzione_2',
-                  'n_iter_2', 'massima_occupazione_memoria_2', 'risultati_uguali']
+                  'n_iter_2', 'massima_occupazione_memoria_2', 'numero_mhs_trovati_2', 'cardinalita_minima_2',
+                  'cardinalita_massima_2', 'risultati_uguali']
         writer.writerow(header)
 
 
@@ -273,7 +284,20 @@ def stringa_da_array(array, a_capo=True):
         return '\n'
 
 
-def scrivi_mhs_su_file(lista_mhs, nome_matrice, colonne, linea_dominio, cartella_risultati, salva_matrice, pre_elab=False):
+def stampa_riepilogo(tempo, n_iterazioni, max_memoria, totale_mhs, min_mhs, max_mhs, pre=False):
+    if pre:
+        print(f"Il tempo richiesto dall'esecuzione con pre-elaborazione e' stato di {tempo} s")
+    else:
+        print(f"Il tempo richiesto dall'esecuzione base e' stato di {tempo} s")
+    print(f"Il numero di iterazioni compiute e' stato di {n_iterazioni}")
+    print(f"La massima occupazione di memoria e' stata di {max_memoria} MiB")
+    print(f"Sono stati trovati {totale_mhs} MHS")
+    print(f"La cardinalita' minima dei MHS trovati e' {min_mhs}")
+    print(f"La cardinalita' massima dei MHS trovati e' {max_mhs}\n")
+
+
+def scrivi_mhs_su_file(lista_mhs, nome_matrice, colonne, linea_dominio, cartella_risultati, salva_matrice,
+                       pre_elab=False):
     if pre_elab:
         percorso_file = Path(cartella_risultati, 'mhs', 'pre_elab', nome_matrice + '.txt')
     else:
@@ -303,6 +327,36 @@ def domanda_si_no(domanda):
             print("Per favore rispondi con sì o no (oppure con s o n)")
 
 
+def plot_memoria(mem_usata, cartella_risultati, nome_matrice, pre_elab=False):
+    fig = plt.figure(figsize=(10, 6), dpi=90)
+    ax = fig.add_subplot(111)
+    titolo = 'Occupazione memoria matrice: ' + nome_matrice
+    ax.set_title(titolo, fontsize=14)
+    mem_usata.sort(key=lambda x: x[1])
+    mem, time = map(list, zip(*mem_usata))
+    global_start = float(time[0])
+    time = [i - global_start for i in time]
+    ax.plot(time, mem, 'r')
+    ax.spines['top'].set_color("none")
+    ax.spines['right'].set_color("none")
+    ax.set_xlabel("tempo (in secondi)", fontsize=12)
+    ax.set_ylabel("memoria usata (in MiB)", fontsize=12)
+    if pre_elab:
+        percorso_file = Path(cartella_risultati, 'plot_memoria', 'pre_elab', nome_matrice + '.png')
+    else:
+        percorso_file = Path(cartella_risultati, 'plot_memoria', 'base', nome_matrice + '.png')
+    plt.savefig(percorso_file)
+
+
+def crea_cartella(cartella):
+    try:
+        cartella.mkdir(parents=True, exist_ok=False)
+    except FileExistsError:
+        print(f"La cartella {str(cartella)} esiste gia', il suo contenuto potrebbe essere riscritto")
+    else:
+        print(f"La cartella {str(cartella)} e' stata creata con successo")
+
+
 def main():
     parser = ArgumentParser(usage="mhs [opzioni] cartella", formatter_class=RawTextHelpFormatter)
     parser.add_argument("-o", "--output", dest="output",
@@ -310,29 +364,39 @@ def main():
                         sulle matrice di input""")
     parser.add_argument("-m", "--matrice", dest="salva_matrice", action="store_true",
                         help="""Opzione per abilitare il salvataggio degli MHS calcolati come matrice""")
+    parser.add_argument("--no-plot", dest="no_plot", action="store_true",
+                        help="""Opzione per disabilitare il salvataggio dei grafici relativi all'occupazione di 
+                        memoria""")
+    parser.add_argument("-v", "--versione", dest="versione", type=int, default=0, choices=range(0, 3),
+                        help="""Opzione per scegliere di eseguire solo la versione base dell'algoritmo (1) oppure 
+                        solo la versione con pre-elaborazione (2), con (0) verranno eseguite entrambe""")
     parser.add_argument("cartella",
                         help="""Cartella che contiene le matrici su cui si vuole applicare l'algoritmo""")
     args = parser.parse_args()
 
     cartella = Path(args.cartella)
+
     if not cartella.is_dir():
         print("Il percorso specificato non e' una cartella")
         sys.exit(1)
 
-    cartella_risultati = Path(args.cartella, 'risultati')
-    try:
-        cartella_mhs = Path(args.cartella, 'risultati', 'mhs', 'pre_elab')
-        cartella_mhs.mkdir(parents=True, exist_ok=False)
-        cartella_mhs = Path(args.cartella, 'risultati', 'mhs', 'base')
-        cartella_mhs.mkdir(parents=True, exist_ok=False)
-    except FileExistsError:
-        print("Cartella dei risultati gia' presente, alcuni file potrebbero essere sovrascritti")
+    if plt:
+        plot = not args.no_plot
     else:
-        print("Cartella dei risultati creata con successo")
+        plot = False
+        print("Il modulo matplotlib non e' installato, impossibile effettuare i plot della memoria")
 
-    output_file_risultati = Path(cartella_risultati, "risultati.csv")
+    cartella_risultati = Path(args.cartella, 'risultati')
+
+    crea_cartella(Path(args.cartella, 'risultati', 'mhs', 'pre_elab'))
+    crea_cartella(Path(args.cartella, 'risultati', 'mhs', 'base'))
+    if plot:
+        crea_cartella(Path(args.cartella, 'risultati', 'plot_memoria', 'pre_elab'))
+        crea_cartella(Path(args.cartella, 'risultati', 'plot_memoria', 'base'))
+
+    output_file_risultati = Path(args.cartella, 'risultati', "risultati.csv")
     if args.output is not None:
-        output_file_risultati = Path(cartella_risultati, args.output)
+        output_file_risultati = Path(args.cartella, 'risultati', args.output)
 
     prepara_risultati_csv(output_file_risultati)
     manager = multiprocessing.Manager()
@@ -346,97 +410,118 @@ def main():
                 break
 
         if controllo:
-            print(f"Inizio esecuzione algoritmo base sulla matrice {nome_matrice}, premi SPAZIO per terminarla")
             stato = manager.dict(matrice=array_matrice, dominio=dominio, nome_matrice=nome_matrice,
                                  colonne=len(array_matrice[0]), linea_dominio=linea_dominio,
                                  cartella_risultati=cartella_risultati,
-                                 salva_matrice=args.salva_matrice)
-            p = multiprocessing.Process(target=esegui_algoritmo_base, args=(stato,))
-            p.start()
-            p.join()
-            p.close()
-            if stato['esecuzione_completata_1']:
-                print("Esecuzione dell'algoritmo base completata\n")
-            tempo_di_esecuzione_1 = stato['tempo_esecuzione_1']
-            massima_occupazione_memoria_1 = stato['massima_occupazione_memoria_1']
-            print(f"Il tempo richiesto dall'esecuzione base e' stato di {tempo_di_esecuzione_1} s")
-            print(f"Il numero di iterazioni compiute e' stato di {stato['n_iter_1']}")
-            print(f"La massima occupazione di memoria e' stata di {massima_occupazione_memoria_1} MiB")
-            print(f"Sono stati trovati {stato['numero_mhs']} MHS")
-            print(f"La cardinalita' minima dei MHS trovati e' {stato['min_mhs']}")
-            print(f"La cardinalita' massima dei MHS trovati e' {stato['max_mhs']}\n")
-
-            risposta = True
-            if not stato['esecuzione_completata_1']:
-                risposta = domanda_si_no(
-                    "Vuoi proseguire con l'applicazione della pre-elaborazione sulla matrice corrente?")
-                if not risposta:
-                    risultati = [nome_matrice, len(stato['matrice']), len(stato['matrice'][0]),
-                                 int(stato['esecuzione_completata_1']), tempo_di_esecuzione_1, stato['n_iter_1'],
-                                 massima_occupazione_memoria_1, stato['numero_mhs'], stato['min_mhs'], stato['max_mhs'],
-                                 '?', '?', '?', '?', '?',
-                                 '?', '?']
-                    scrivi_risultati_csv(risultati, output_file_risultati)
-
-            if stato['esecuzione_completata_1'] or risposta:
-                print(f"Inizio esecuzione algoritmo con pre-elaborazione sulla matrice {nome_matrice}, premi SPAZIO "
-                      f"per terminarla")
-                p = multiprocessing.Process(target=esegui_algoritmo_con_pre, args=(stato,))
+                                 salva_matrice=args.salva_matrice, plot=plot)
+            pre_elab = True
+            proseguire = True
+            if args.versione != 2:
+                print(f"Inizio esecuzione algoritmo base sulla matrice {nome_matrice}, premi SPAZIO per terminarla")
+                print("Nota: SPAZIO termina l'esecuzione anche quando si e' in un'altra finestra")
+                p = multiprocessing.Process(target=esegui_algoritmo_base, args=(stato,))
                 p.start()
                 p.join()
                 p.close()
-
-                if stato['esecuzione_completata_2']:
-                    print("Esecuzione dell'algoritmo con pre-elaborazione completata\n")
-                tempo_di_esecuzione_2 = stato['tempo_esecuzione_2']
-                massima_occupazione_memoria_2 = stato['massima_occupazione_memoria_2']
-                righe_rimosse = stato['righe_rimosse']
-                colonne_rimosse = stato['colonne_rimosse']
-                nuovo_numero_righe = len(stato['matrice']) - stato['num_righe_rimosse']
-                nuovo_numero_colonne = len(stato['matrice'][0]) - stato['num_colonne_rimosse']
-                print(f"Dopo l'esecuzione della pre-elaborazione, il nuovo numero di righe e' {nuovo_numero_righe}")
-                print(f"Dopo l'esecuzione della pre-elaborazione, il nuovo numero di colonne e' {nuovo_numero_colonne}")
-
-                print(f"Gli indici di riga rimossi sono: {stringa_da_array(righe_rimosse, a_capo=False)}")
-                print(
-                    f"Gli indici di colonna rimossi sono: {stringa_da_array(sorted(colonne_rimosse), a_capo=False)}\n")
-
-                print(f"Il tempo richiesto dall'esecuzione con pre-elaborazione e' stato di {tempo_di_esecuzione_2} s")
-                print(f"Il numero di iterazioni compiute e' stato di {stato['n_iter_2']}")
-                print(f"La massima occupazione di memoria e' stata di {massima_occupazione_memoria_2} MiB")
-                print(f"Sono stati trovati {stato['numero_mhs_2']} MHS")
-
-                if stato['esecuzione_completata_1'] and stato['esecuzione_completata_2']:
-                    print("Controllo risultati esecuzione con pre-elaborazione in corso")
-                    mhs_pre_elab = Path(cartella_risultati, 'mhs', 'pre_elab', nome_matrice + '.txt')
-                    mhs_base = Path(cartella_risultati, 'mhs', 'base', nome_matrice + '.txt')
-                    risultati_uguali = filecmp.cmp(mhs_base, mhs_pre_elab, shallow=False)
-                    if risultati_uguali:
-                        print(
-                            "I risultati ottenuti eseguendo la pre-elaborazione prima dell'applicazione dell'algoritmo "
-                            "sono UGUALI a quelli ottenuti applicando l'algoritmo base\n")
-                    else:
-                        print("ERRORE: I risultati ottenuti eseguendo la pre-elaborazione prima dell'applicazione "
-                              "dell'algoritmo sono DIVERSI da quelli ottenuti applicando l'algoritmo base\n")
-                    risultati_uguali = int(risultati_uguali)
+                if stato['esecuzione_completata_1']:
+                    print("Esecuzione dell'algoritmo base completata\n")
+                stampa_riepilogo(stato['tempo_esecuzione_1'], stato['n_iter_1'], stato['massima_occupazione_memoria_1'],
+                                 stato['numero_mhs'], stato['min_mhs_1'], stato['max_mhs_1'])
+                if args.versione == 1:
+                    risultati = [nome_matrice, len(stato['matrice']), len(stato['matrice'][0]),
+                                 int(stato['esecuzione_completata_1']), (stato['tempo_esecuzione_1']),
+                                 stato['n_iter_1'],
+                                 (stato['massima_occupazione_memoria_1']), stato['numero_mhs'], stato['min_mhs_1'],
+                                 stato['max_mhs_1'],
+                                 '?', '?', '?', '?', '?',
+                                 '?', '?', '?', '?', '?']
+                    scrivi_risultati_csv(risultati, output_file_risultati)
+                    if not stato['esecuzione_completata_1']:
+                        proseguire = domanda_si_no(
+                            "Vuoi proseguire l'esecuzione del programma con la prossima matrice?")
+                        if not proseguire:
+                            break
                 else:
-                    risultati_uguali = '?'
-                    print("Una delle  due esecuzioni dell'algoritmo è stata terminata dall'utente, il controllo dei "
-                          "risultati non è valido\n")
+                    if not stato['esecuzione_completata_1']:
+                        pre_elab = domanda_si_no(
+                            "Vuoi proseguire con l'applicazione della pre-elaborazione sulla matrice corrente?")
+                        if not pre_elab:
+                            proseguire = domanda_si_no(
+                                "Vuoi proseguire l'esecuzione del programma con la prossima matrice?")
+                            if not proseguire:
+                                break
 
-                risultati = [nome_matrice, len(stato['matrice']), len(stato['matrice'][0]),
-                             int(stato['esecuzione_completata_1']),
-                             tempo_di_esecuzione_1, stato['n_iter_1'],
-                             massima_occupazione_memoria_1, stato['numero_mhs'], stato['min_mhs'], stato['max_mhs'],
-                             nuovo_numero_righe, nuovo_numero_colonne, int(stato['esecuzione_completata_2']),
-                             tempo_di_esecuzione_2, stato['n_iter_2'],
-                             massima_occupazione_memoria_2, risultati_uguali]
-                scrivi_risultati_csv(risultati, output_file_risultati)
+            if args.versione != 1:
+                if args.versione == 2 or pre_elab:
+                    print(
+                        f"Inizio esecuzione algoritmo con pre-elaborazione sulla matrice {nome_matrice}, premi SPAZIO "
+                        f"per terminarla")
+                    print("Nota: SPAZIO termina l'esecuzione anche quando si e' in un'altra finestra")
+                    p = multiprocessing.Process(target=esegui_algoritmo_con_pre, args=(stato,))
+                    p.start()
+                    p.join()
+                    p.close()
+                    nuovo_numero_righe = len(stato['matrice']) - stato['num_righe_rimosse']
+                    nuovo_numero_colonne = len(stato['matrice'][0]) - stato['num_colonne_rimosse']
+                    print(f"Dopo l'esecuzione della pre-elaborazione, il nuovo numero di righe e' {nuovo_numero_righe}")
+                    print(f"Dopo l'esecuzione della pre-elaborazione, "
+                          f"il nuovo numero di colonne e' {nuovo_numero_colonne}")
 
-            if not risposta or not stato['esecuzione_completata_2']:
-                risposta = domanda_si_no("Vuoi proseguire l'esecuzione del programma con la prossima matrice?")
-                if not risposta:
-                    break
+                    print(f"Gli indici di riga rimossi sono: {stringa_da_array(stato['righe_rimosse'], a_capo=False)}")
+                    print(f"Gli indici di colonna rimossi sono: "
+                          f"{stringa_da_array(sorted(stato['colonne_rimosse']), a_capo=False)}\n")
+
+                    stampa_riepilogo(stato['tempo_esecuzione_2'], stato['n_iter_2'],
+                                     stato['massima_occupazione_memoria_2'],
+                                     stato['numero_mhs_2'], stato['min_mhs_2'], stato['max_mhs_2'], pre=True)
+
+                    if args.versione == 2:
+                        risultati = [nome_matrice, len(stato['matrice']), len(stato['matrice'][0]),
+                                     '?', '?', '?', '?', '?', '?', '?',
+                                     nuovo_numero_righe, nuovo_numero_colonne, int(stato['esecuzione_completata_2']),
+                                     (stato['tempo_esecuzione_2']), stato['n_iter_2'],
+                                     (stato['massima_occupazione_memoria_2']), stato['numero_mhs_2'], stato['min_mhs_2'], stato['max_mhs_2'], '?']
+                        scrivi_risultati_csv(risultati, output_file_risultati)
+                        if not stato['esecuzione_completata_2']:
+                            proseguire = domanda_si_no(
+                                "Vuoi proseguire l'esecuzione del programma con la prossima matrice?")
+                            if not proseguire:
+                                break
+
+            if args.versione == 0:
+                if pre_elab:
+                    if stato['esecuzione_completata_1'] and stato['esecuzione_completata_2']:
+                        print("Controllo risultati esecuzione con pre-elaborazione in corso")
+                        mhs_pre_elab = Path(cartella_risultati, 'mhs', 'pre_elab', nome_matrice + '.txt')
+                        mhs_base = Path(cartella_risultati, 'mhs', 'base', nome_matrice + '.txt')
+                        risultati_uguali = filecmp.cmp(mhs_base, mhs_pre_elab, shallow=False)
+                        if risultati_uguali:
+                            print("I risultati ottenuti eseguendo la pre-elaborazione prima dell'applicazione "
+                                  "dell'algoritmo sono UGUALI a quelli ottenuti applicando l'algoritmo base\n")
+                        else:
+                            print("ERRORE: I risultati ottenuti eseguendo la pre-elaborazione prima dell'applicazione "
+                                  "dell'algoritmo sono DIVERSI da quelli ottenuti applicando l'algoritmo base\n")
+                        risultati_uguali = int(risultati_uguali)
+                    else:
+                        risultati_uguali = '?'
+                        print("Almeno una delle due esecuzioni dell'algoritmo e' stata terminata dall'utente, "
+                              "il controllo dei risultati non puo' essere fatto\n")
+
+                    risultati = [nome_matrice, len(stato['matrice']), len(stato['matrice'][0]),
+                                 int(stato['esecuzione_completata_1']),
+                                 (stato['tempo_esecuzione_1']), stato['n_iter_1'],
+                                 (stato['massima_occupazione_memoria_1']), stato['numero_mhs'], stato['min_mhs_1'],
+                                 stato['max_mhs_1'],
+                                 nuovo_numero_righe, nuovo_numero_colonne, int(stato['esecuzione_completata_2']),
+                                 (stato['tempo_esecuzione_2']), stato['n_iter_2'],
+                                 (stato['massima_occupazione_memoria_2']), stato['numero_mhs_2'], stato['min_mhs_2'],
+                                 stato['max_mhs_2'], risultati_uguali]
+                    scrivi_risultati_csv(risultati, output_file_risultati)
+                    if not stato['esecuzione_completata_2']:
+                        proseguire = domanda_si_no(
+                            "Vuoi proseguire l'esecuzione del programma con la prossima matrice?")
+                        if not proseguire:
+                            break
     print("Esecuzione programma terminata")
 
 
