@@ -27,6 +27,34 @@ from pynput import keyboard
 break_program = False
 
 
+class MultiInsieme:
+
+    def __init__(self, cardinalità):
+        if cardinalità == 0:
+            self.lista_array = []
+        else:
+            self.lista_array = [arr.array('H', []) for _ in range(cardinalità)]
+        self.cardinalità = cardinalità
+
+    def __len__(self):
+        if not self.lista_array:
+            return 0
+        return len(self.lista_array[0])
+
+    def get(self, indice):
+        if not self.lista_array:
+            return arr.array('H', [])
+        return arr.array('H', [self.lista_array[i][indice] for i in range(self.cardinalità)])
+
+    def aggiungi_insiemi(self, base, elementi):
+        if not len(base):
+            self.lista_array[0].extend(elementi)
+        else:
+            for i in range(len(base)):
+                self.lista_array[i].extend(arr.array('H', [base[i]] * len(elementi)))
+            self.lista_array[len(base)].extend(elementi)
+
+
 def on_press(key):
     global break_program
     if key == keyboard.Key.space:
@@ -93,30 +121,50 @@ def alg_base(matrice, dominio):
     lista_mhs = []
     coda = deque()
     valore_max = len(matrice[0])
-    coda.append(arr.array('H', []))
+    coda.append(MultiInsieme(0))
     with keyboard.Listener(on_press=on_press) as listener:
         while coda and not break_program:
-            insieme = coda.popleft()
-            m = max_insieme(insieme)
-            e = succ(m)
+            multi_insieme = coda.popleft()
+            multi_insieme_ok = MultiInsieme(multi_insieme.cardinalità + 1)
+            multi_insieme_mhs = MultiInsieme(multi_insieme.cardinalità + 1)
+            len_multi_insieme = len(multi_insieme)
+            if not len_multi_insieme:  # Insieme vuoto, devo ottenere i singoletti
+                len_multi_insieme += 1
+            for i in range(len_multi_insieme):
+                insieme = multi_insieme.get(i)
 
-            for elem in range(e, valore_max + 1):
-                n_iter += 1
-                nuovo_insieme = insieme[:]
-                nuovo_insieme.append(elem)
-                vett_rapp = crea_vett_rapp(nuovo_insieme, matrice)
-                result = check(nuovo_insieme, vett_rapp)
-                if result == "ok" and elem != valore_max:
-                    coda.append(nuovo_insieme)
-                elif result == "mhs":
-                    lista_mhs.append(nuovo_insieme)
+                m = max_insieme(insieme)
+                e = succ(m)
+
+                ok_array = arr.array('H', [])
+                mhs_array = arr.array('H', [])
+                for elem in range(e, valore_max + 1):
+                    n_iter += 1
+                    vett_rapp = crea_vett_rapp(insieme, elem, matrice)
+                    result = check(insieme, elem, vett_rapp)
+                    if result == "ok" and elem != valore_max:
+                        ok_array.append(elem)
+                    elif result == "mhs":
+                        mhs_array.append(elem)
+                if ok_array:
+                    multi_insieme_ok.aggiungi_insiemi(insieme, ok_array)
+                if mhs_array:
+                    multi_insieme_mhs.aggiungi_insiemi(insieme, mhs_array)
+            if len(multi_insieme_ok):
+                coda.append(multi_insieme_ok)
+            if len(multi_insieme_mhs):
+                lista_mhs.append(multi_insieme_mhs)
     output(lista_mhs, dominio)
     return lista_mhs, process_time() - start_time, n_iter
 
 
-def check(nuovo_insieme, vett_rapp):
+def check(insieme, elem, vett_rapp):
     proiezione = set(vett_rapp)
-    for i in nuovo_insieme:
+
+    if elem not in proiezione:
+        return "ko"
+
+    for i in insieme:
         if i not in proiezione:
             return "ko"
 
@@ -126,8 +174,8 @@ def check(nuovo_insieme, vett_rapp):
         return "mhs"
 
 
-def crea_vett_rapp(insieme, array_matrice):
-    vett_rapp = arr.array('H', [0] * len(array_matrice))
+def crea_vett_rapp(insieme, elem, array_matrice):
+    vett_rapp = arr.array('H', [array_matrice[i][elem - 1] * elem for i in range(len(array_matrice))])
     for i in range(len(array_matrice)):
         for j in insieme:
             if array_matrice[i][j - 1]:
@@ -140,9 +188,10 @@ def crea_vett_rapp(insieme, array_matrice):
 
 
 def output(lista_mhs, dominio):
-    for mhs in lista_mhs:
-        for i in range(len(mhs)):
-            mhs[i] = dominio[mhs[i] - 1]
+    for multi_mhs in lista_mhs:
+        for riga in multi_mhs.lista_array:
+            for i in range(len(riga)):
+                riga[i] = dominio[riga[i] - 1]
 
 
 def contiene(matrice, i, j):
@@ -213,9 +262,20 @@ def alg_con_pre(matrice, dominio):
 
 def max_min_mhs(lista_mhs):
     if lista_mhs:
-        return len(max(lista_mhs, key=len)), len(min(lista_mhs, key=len))
+        def dimensione(x):
+            return x.cardinalità
+        max_multi_mhs = max(lista_mhs, key=dimensione)
+        min_multi_mhs = min(lista_mhs, key=dimensione)
+        return max_multi_mhs.cardinalità, min_multi_mhs.cardinalità
     else:
         return 0, 0
+
+
+def numero_mhs(lista_mhs):
+    totale = 0
+    for multi_mhs in lista_mhs:
+        totale += len(multi_mhs)
+    return totale
 
 
 def esegui_algoritmo_base(stato):
@@ -227,7 +287,7 @@ def esegui_algoritmo_base(stato):
     stato['tempo_esecuzione_1'] = ret[1]
     scrivi_mhs_su_file(ret[0], stato['nome_matrice'], stato['colonne'], stato['linea_dominio'],
                        stato['cartella_risultati'], stato['salva_matrice'])
-    stato['numero_mhs'] = len(ret[0])
+    stato['numero_mhs'] = numero_mhs(ret[0])
     stato['max_mhs_1'], stato['min_mhs_1'] = max_min_mhs(ret[0])
     stato['n_iter_1'] = ret[2]
     if stato['plot']:
@@ -246,7 +306,7 @@ def esegui_algoritmo_con_pre(stato):
     stato['num_righe_rimosse'] = ret[4]
     stato['colonne_rimosse'] = ret[5]
     stato['num_colonne_rimosse'] = ret[6]
-    stato['numero_mhs_2'] = len(ret[0])
+    stato['numero_mhs_2'] = numero_mhs(ret[0])
     stato['max_mhs_2'], stato['min_mhs_2'] = max_min_mhs(ret[0])
     scrivi_mhs_su_file(ret[0], stato['nome_matrice'], stato['colonne'], stato['linea_dominio'],
                        stato['cartella_risultati'], stato['salva_matrice'], pre_elab=True)
@@ -305,14 +365,16 @@ def scrivi_mhs_su_file(lista_mhs, nome_matrice, colonne, linea_dominio, cartella
     percorso_file.touch()
     with percorso_file.open('w') as file:
         file.write(linea_dominio)
-        for mhs in lista_mhs:
-            if salva_matrice:
-                mhs_array = arr.array('H', [0] * colonne)
-                for elem in mhs:
-                    mhs_array[elem] = 1
-                file.write(stringa_da_array(mhs_array))
-            else:
-                file.write(stringa_da_array(mhs))
+        for multi_mhs in lista_mhs:
+            for i in range(len(multi_mhs)):
+                mhs = multi_mhs.get(i)
+                if salva_matrice:
+                    mhs_array = arr.array('H', [0] * colonne)
+                    for elem in mhs:
+                        mhs_array[elem] = 1
+                    file.write(stringa_da_array(mhs_array))
+                else:
+                    file.write(stringa_da_array(mhs))
 
 
 def domanda_si_no(domanda):
@@ -358,24 +420,23 @@ def crea_cartella(cartella):
 
 
 def main():
-    parser = ArgumentParser(usage="mhs [opzioni] cartella", formatter_class=RawTextHelpFormatter)
+    parser = ArgumentParser(usage="mhs_migliorato [opzioni] cartella", formatter_class=RawTextHelpFormatter)
     parser.add_argument("-o", "--output", dest="output",
                         help="""Nome del file in cui verra' salvato il report riguardante l'esecuzione dell'algoritmo 
-                        sulle matrice di input""")
+                            sulle matrice di input""")
     parser.add_argument("-m", "--matrice", dest="salva_matrice", action="store_true",
                         help="""Opzione per abilitare il salvataggio degli MHS calcolati come matrice""")
     parser.add_argument("--no-plot", dest="no_plot", action="store_true",
                         help="""Opzione per disabilitare il salvataggio dei grafici relativi all'occupazione di 
-                        memoria""")
+                            memoria""")
     parser.add_argument("-v", "--versione", dest="versione", type=int, default=0, choices=range(0, 3),
                         help="""Opzione per scegliere di eseguire solo la versione base dell'algoritmo (1) oppure 
-                        solo la versione con pre-elaborazione (2), con (0) verranno eseguite entrambe""")
+                            solo la versione con pre-elaborazione (2), con (0) verranno eseguite entrambe""")
     parser.add_argument("cartella",
                         help="""Cartella che contiene le matrici su cui si vuole applicare l'algoritmo""")
     args = parser.parse_args()
 
     cartella = Path(args.cartella)
-
     if not cartella.is_dir():
         print("Il percorso specificato non e' una cartella")
         sys.exit(1)
@@ -398,9 +459,9 @@ def main():
         if args.versione != 2:
             crea_cartella(Path(args.cartella, 'risultati', 'plot_memoria', 'base'))
 
-    output_file_risultati = Path(args.cartella, 'risultati', "risultati.csv")
+    output_file_risultati = Path(cartella_risultati, "risultati.csv")
     if args.output is not None:
-        output_file_risultati = Path(args.cartella, 'risultati', args.output)
+        output_file_risultati = Path(cartella_risultati, args.output)
 
     prepara_risultati_csv(output_file_risultati)
     manager = multiprocessing.Manager()
@@ -484,7 +545,8 @@ def main():
                                      '?', '?', '?', '?', '?', '?', '?',
                                      nuovo_numero_righe, nuovo_numero_colonne, int(stato['esecuzione_completata_2']),
                                      (stato['tempo_esecuzione_2']), stato['n_iter_2'],
-                                     (stato['massima_occupazione_memoria_2']), stato['numero_mhs_2'], stato['min_mhs_2'], stato['max_mhs_2'], '?']
+                                     (stato['massima_occupazione_memoria_2']), stato['numero_mhs_2'],
+                                     stato['min_mhs_2'], stato['max_mhs_2'], '?']
                         scrivi_risultati_csv(risultati, output_file_risultati)
                         if not stato['esecuzione_completata_2']:
                             proseguire = domanda_si_no(
