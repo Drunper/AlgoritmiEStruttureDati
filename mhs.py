@@ -35,22 +35,22 @@ def on_press(key):
         return False
 
 
-def leggi_matrice(path):
-    data = []
-    with path.open('r') as file:
-        for line in file:
-            if line[0] != ";":
-                new_line = line.replace("-", "")
-                line_elements = new_line.split(" ")
-                line_elements.remove("\n")
-                data.append(arr.array('B', list(map(int, line_elements))))
-    return data
+def leggi_matrice(percorso_file):
+    matrice = []
+    with percorso_file.open('r') as file:
+        for riga in file:
+            if riga[0] != ";":
+                nuova_riga = riga.replace("-", "")
+                elementi = nuova_riga.split(" ")
+                elementi.remove("\n")
+                matrice.append(arr.array('B', list(map(int, elementi))))
+    return matrice
 
 
 def leggi_dominio(nome_file):
-    line = linecache.getline(nome_file, 5)
-    dom = re.findall('\(([^)]+)', line)
-    return dom, line
+    riga_dominio = linecache.getline(nome_file, 5)
+    dominio = re.findall('\(([^)]+)', riga_dominio)
+    return dominio, riga_dominio
 
 
 def carica_matrice(percorso_file):
@@ -126,11 +126,11 @@ def check(nuovo_insieme, vett_rapp):
         return "mhs"
 
 
-def crea_vett_rapp(insieme, array_matrice):
-    vett_rapp = arr.array('H', [0] * len(array_matrice))
-    for i in range(len(array_matrice)):
+def crea_vett_rapp(insieme, matrice):
+    vett_rapp = arr.array('H', [0] * len(matrice))
+    for i in range(len(matrice)):
         for j in insieme:
-            if array_matrice[i][j - 1]:
+            if matrice[i][j - 1]:
                 if vett_rapp[i]:
                     vett_rapp[i] = 65535
                     break
@@ -213,7 +213,7 @@ def alg_con_pre(matrice, dominio):
 
 def max_min_mhs(lista_mhs):
     if lista_mhs:
-        return len(max(lista_mhs, key=len)), len(min(lista_mhs, key=len))
+        return max(map(len, lista_mhs)), min(map(len, lista_mhs))
     else:
         return 0, 0
 

@@ -29,12 +29,12 @@ break_program = False
 
 class MultiInsieme:
 
-    def __init__(self, cardinalità):
-        if cardinalità == 0:
+    def __init__(self, cardinalita):
+        if cardinalita == 0:
             self.lista_array = []
         else:
-            self.lista_array = [arr.array('H', []) for _ in range(cardinalità)]
-        self.cardinalità = cardinalità
+            self.lista_array = [arr.array('H', []) for _ in range(cardinalita)]
+        self.cardinalita = cardinalita
 
     def __len__(self):
         if not self.lista_array:
@@ -44,7 +44,7 @@ class MultiInsieme:
     def get(self, indice):
         if not self.lista_array:
             return arr.array('H', [])
-        return arr.array('H', [self.lista_array[i][indice] for i in range(self.cardinalità)])
+        return arr.array('H', [self.lista_array[i][indice] for i in range(self.cardinalita)])
 
     def aggiungi_insiemi(self, base, elementi):
         if not len(base):
@@ -63,38 +63,38 @@ def on_press(key):
         return False
 
 
-def leggi_matrice(path):
-    data = []
-    with path.open('r') as file:
-        for line in file:
-            if line[0] != ";":
-                new_line = line.replace("-", "")
-                line_elements = new_line.split(" ")
-                line_elements.remove("\n")
-                data.append(arr.array('B', list(map(int, line_elements))))
-    return data
+def leggi_matrice(percorso_file):
+    matrice = []
+    with percorso_file.open('r') as file:
+        for riga in file:
+            if riga[0] != ";":
+                nuova_riga = riga.replace("-", "")
+                elementi = nuova_riga.split(" ")
+                elementi.remove("\n")
+                matrice.append(arr.array('B', list(map(int, elementi))))
+    return matrice
 
 
 def leggi_dominio(nome_file):
-    line = linecache.getline(nome_file, 5)
-    dom = re.findall('\(([^)]+)', line)
-    return dom, line
+    riga_dominio = linecache.getline(nome_file, 5)
+    dominio = re.findall('\(([^)]+)', riga_dominio)
+    return dominio, riga_dominio
 
 
 def carica_matrice(percorso_file):
     print(f'Caricamento matrice dal file {str(percorso_file)}')
-    array = leggi_matrice(percorso_file)
-    righe = len(array)
-    colonne = len(array[0])
+    matrice = leggi_matrice(percorso_file)
+    righe = len(matrice)
+    colonne = len(matrice[0])
     nome_matrice = percorso_file.stem
     dominio_matrice, linea_dominio = leggi_dominio(str(percorso_file))
-    if len(array[0]) == len(dominio_matrice):
+    if len(matrice[0]) == len(dominio_matrice):
         print('Matrice caricata con successo')
         print(f'Matrice: {nome_matrice}')
         print(f'Numero righe: {righe}')
         print(f'Numero colonne: {colonne}')
-        dominio_base = arr.array('H', list(range(0, len(array[0]))))
-        return nome_matrice, array, dominio_base, linea_dominio, True
+        dominio_base = arr.array('H', list(range(0, len(matrice[0]))))
+        return nome_matrice, matrice, dominio_base, linea_dominio, True
     else:
         print('Errore sulle dimensioni del file')
         return nome_matrice, [], [], linea_dominio, False
@@ -125,8 +125,8 @@ def alg_base(matrice, dominio):
     with keyboard.Listener(on_press=on_press) as listener:
         while coda and not break_program:
             multi_insieme = coda.popleft()
-            multi_insieme_ok = MultiInsieme(multi_insieme.cardinalità + 1)
-            multi_insieme_mhs = MultiInsieme(multi_insieme.cardinalità + 1)
+            multi_insieme_ok = MultiInsieme(multi_insieme.cardinalita + 1)
+            multi_insieme_mhs = MultiInsieme(multi_insieme.cardinalita + 1)
             len_multi_insieme = len(multi_insieme)
             if not len_multi_insieme:  # Insieme vuoto, devo ottenere i singoletti
                 len_multi_insieme += 1
@@ -174,11 +174,11 @@ def check(insieme, elem, vett_rapp):
         return "mhs"
 
 
-def crea_vett_rapp(insieme, elem, array_matrice):
-    vett_rapp = arr.array('H', [array_matrice[i][elem - 1] * elem for i in range(len(array_matrice))])
-    for i in range(len(array_matrice)):
+def crea_vett_rapp(insieme, elem, matrice):
+    vett_rapp = arr.array('H', [matrice[i][elem - 1] * elem for i in range(len(matrice))])
+    for i in range(len(matrice)):
         for j in insieme:
-            if array_matrice[i][j - 1]:
+            if matrice[i][j - 1]:
                 if vett_rapp[i]:
                     vett_rapp[i] = 65535
                     break
@@ -263,10 +263,8 @@ def alg_con_pre(matrice, dominio):
 def max_min_mhs(lista_mhs):
     if lista_mhs:
         def dimensione(x):
-            return x.cardinalità
-        max_multi_mhs = max(lista_mhs, key=dimensione)
-        min_multi_mhs = min(lista_mhs, key=dimensione)
-        return max_multi_mhs.cardinalità, min_multi_mhs.cardinalità
+            return x.cardinalita
+        return (max(map(dimensione, lista_mhs))), (min(map(dimensione, lista_mhs)))
     else:
         return 0, 0
 
