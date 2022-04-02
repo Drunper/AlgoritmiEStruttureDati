@@ -500,6 +500,15 @@ def main():
                                  '?', '?', '?', '?', '?']
                     scrivi_risultati_csv(risultati, output_file_risultati)
                     if not stato['esecuzione_completata_1']:
+                        risultati = [nome_matrice, len(stato['matrice']), len(stato['matrice'][0]),
+                                     int(stato['esecuzione_completata_1']), (stato['tempo_esecuzione_1']),
+                                     stato['n_iter_1'],
+                                     (stato['massima_occupazione_memoria_1']), stato['numero_mhs'],
+                                     stato['min_mhs_1'],
+                                     stato['max_mhs_1'],
+                                     '?', '?', '?', '?', '?',
+                                     '?', '?', '?', '?', '?']
+                        scrivi_risultati_csv(risultati, output_file_risultati)
                         proseguire = domanda_si_no(
                             "Vuoi proseguire l'esecuzione del programma con la prossima matrice?")
                         if not proseguire:
@@ -532,7 +541,7 @@ def main():
 
                     print(f"Gli indici di riga rimossi sono: {stringa_da_array(stato['righe_rimosse'], a_capo=False)}")
                     print(f"Gli indici di colonna rimossi sono: "
-                          f"{stringa_da_array(sorted(stato['colonne_rimosse']), a_capo=False)}\n")
+                          f"{stringa_da_array(sorted(stato['colonne_rimosse']))}")
 
                     stampa_riepilogo(stato['tempo_esecuzione_2'], stato['n_iter_2'],
                                      stato['massima_occupazione_memoria_2'],
